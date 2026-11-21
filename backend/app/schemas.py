@@ -1,23 +1,18 @@
 
+from datetime import datetime
+from typing import Optional
+
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
 
 
-# Registration request
+# USER SCHEMAS
+
 class UserCreate(BaseModel):
-    full_name: str = Field(
-        min_length=2,
-        max_length=100
-    )
-
+    full_name: str = Field(min_length=2, max_length=100)
     email: EmailStr
-
-    password: str = Field(
-        min_length=8,
-        max_length=128
-    )
+    password: str = Field(min_length=8, max_length=128)
 
 
-# User information returned by the API
 class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -27,14 +22,62 @@ class UserResponse(BaseModel):
     role: str
 
 
-# Login request
 class UserLogin(BaseModel):
     email: EmailStr
-
     password: str
 
 
-# JWT token response
 class Token(BaseModel):
     access_token: str
     token_type: str
+
+
+# PROJECT SCHEMAS
+
+class ProjectCreate(BaseModel):
+    name: str = Field(min_length=2, max_length=150)
+    description: Optional[str] = None
+
+
+class ProjectResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    description: Optional[str]
+    status: str
+    owner_id: int
+    created_at: datetime
+
+
+# TASK SCHEMAS
+
+class TaskCreate(BaseModel):
+    title: str = Field(min_length=2, max_length=200)
+    description: Optional[str] = None
+    priority: str = Field(default="medium", pattern="^(low|medium|high)$")
+    due_date: Optional[datetime] = None
+
+
+class TaskUpdate(BaseModel):
+    title: Optional[str] = Field(default=None, min_length=2, max_length=200)
+    description: Optional[str] = None
+    priority: Optional[str] = Field(
+        default=None,
+        pattern="^(low|medium|high)$"
+    )
+    completed: Optional[bool] = None
+    due_date: Optional[datetime] = None
+
+
+class TaskResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    title: str
+    description: Optional[str]
+    priority: str
+    completed: bool
+    due_date: Optional[datetime]
+    project_id: int
+    created_at: datetime

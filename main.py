@@ -1,11 +1,9 @@
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
-from backend.app.database import engine, Base
-from backend.app import models
+from backend.app.database import engine
 from backend.app.routes import router
-
-Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="DevTrack API",
@@ -13,7 +11,19 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Register API routes
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174"
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.include_router(router)
 
 
@@ -27,15 +37,13 @@ def home():
 
 @app.get("/health")
 def health_check():
-    return {
-        "status": "healthy"
-    }
+    return {"status": "healthy"}
 
 
 @app.get("/db-check")
 def database_check():
     try:
-        with engine.connect() as connection:
+        with engine.connect():
             return {
                 "database": "Connected successfully!",
                 "status": "healthy"
