@@ -79,6 +79,7 @@ class Task(Base):
     )
 
     completed = Column(Boolean, default=False, nullable=False)
+    status = Column(String(20), default="todo", server_default="todo", nullable=False)
 
     due_date = Column(DateTime(timezone=True), nullable=True)
 
@@ -96,3 +97,20 @@ class Task(Base):
     )
 
     project = relationship("Project", back_populates="tasks")
+
+
+class ActivityEvent(Base):
+    __tablename__ = "activity_events"
+
+    id = Column(Integer, primary_key=True)
+    owner_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    action = Column(String(30), nullable=False)
+    subject = Column(String(200), nullable=False)
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )

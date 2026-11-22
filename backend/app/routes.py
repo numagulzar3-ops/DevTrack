@@ -1,5 +1,7 @@
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Literal
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
@@ -8,7 +10,7 @@ from backend.app.dependencies import (
     get_current_user,
     get_admin_user
 )
-from backend.app.models import User, Project, Task
+from backend.app.models import ActivityEvent, User, Project, Task
 from backend.app.schemas import (
     UserCreate,
     UserResponse,
@@ -18,7 +20,8 @@ from backend.app.schemas import (
     ProjectResponse,
     TaskCreate,
     TaskUpdate,
-    TaskResponse
+    TaskResponse,
+    ActivityResponse,
 )
 from backend.app.security import hash_password, verify_password
 from backend.app.auth import create_access_token
@@ -127,6 +130,7 @@ def create_project(
     )
 
     db.add(new_project)
+    db.add(ActivityEvent(owner_id=current_user.id, action="project_created", subject=new_project.name))
     db.commit()
     db.refresh(new_project)
 
@@ -163,6 +167,23 @@ def get_project(
     return project
 
 
+@router.put("/projects/{project_id}", response_model=ProjectResponse)
+def update_project(
+    project_id: int,
+    project_data: ProjectCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    project = get_project(project_id, db, current_user)
+    if (project.name, project.description) != (project_data.name, project_data.description):
+        project.name = project_data.name
+        project.description = project_data.description
+        db.add(ActivityEvent(owner_id=current_user.id, action="project_updated", subject=project.name))
+        db.commit()
+        db.refresh(project)
+    return project
+
+
 @router.delete(
     "/projects/{project_id}",
     status_code=status.HTTP_204_NO_CONTENT
@@ -183,6 +204,7 @@ def delete_project(
             detail="Project not found"
         )
 
+    db.add(ActivityEvent(owner_id=current_user.id, action="project_deleted", subject=project.name))
     db.delete(project)
     db.commit()
 
@@ -222,6 +244,7 @@ def create_task(
     )
 
     db.add(new_task)
+    db.add(ActivityEvent(owner_id=current_user.id, action="task_created", subject=new_task.title))
     db.commit()
     db.refresh(new_task)
 
@@ -253,6 +276,16 @@ def get_project_tasks(
     ).order_by(Task.created_at.desc()).all()
 
 
+@router.get("/tasks", response_model=list[TaskResponse])
+def get_tasks(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return db.query(Task).join(Project).filter(
+        Project.owner_id == current_user.id
+    ).order_by(Task.created_at.desc(), Task.id.desc()).all()
+
+
 @router.patch("/tasks/{task_id}", response_model=TaskResponse)
 def update_task(
     task_id: int,
@@ -277,9 +310,31 @@ def update_task(
         )
 
     updates = task_data.model_dump(exclude_unset=True)
+    for field in ("title", "priority", "completed", "status"):
+        if field in updates and updates[field] is None:
+            raise HTTPException(status_code=422, detail=f"{field} cannot be null")
 
-    for field, value in updates.items():
+    if "status" in updates:
+        completed = updates["status"] == "done"
+        if "completed" in updates and updates["completed"] != completed:
+            raise HTTPException(status_code=422, detail="Task status and completion disagree")
+        updates["completed"] = completed
+    elif "completed" in updates and task.completed != updates["completed"]:
+        updates["status"] = "done" if updates["completed"] else "todo"
+
+
+    changed_fields = {
+        field: value for field, value in updates.items()
+        if getattr(task, field) != value
+    }
+    for field, value in changed_fields.items():
         setattr(task, field, value)
+
+    if changed_fields:
+        action = "task_updated"
+        if "completed" in changed_fields:
+            action = "task_completed" if task.completed else "task_reopened"
+        db.add(ActivityEvent(owner_id=current_user.id, action=action, subject=task.title))
 
     db.commit()
     db.refresh(task)
@@ -312,8 +367,24 @@ def delete_task(
             detail="Task not found"
         )
 
+    db.add(ActivityEvent(owner_id=current_user.id, action="task_deleted", subject=task.title))
     db.delete(task)
     db.commit()
+
+
+@router.get("/activity", response_model=list[ActivityResponse])
+def get_activity(
+    kind: Literal["project", "task"] | None = None,
+    limit: int = Query(default=50, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    events = db.query(ActivityEvent).filter(ActivityEvent.owner_id == current_user.id)
+    if kind is not None:
+        events = events.filter(ActivityEvent.action.startswith(f"{kind}_", autoescape=True))
+    return events.order_by(
+        ActivityEvent.created_at.desc(), ActivityEvent.id.desc()
+    ).limit(limit).all()
 
 
 # -------------------------

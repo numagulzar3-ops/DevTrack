@@ -4,7 +4,9 @@ import "./ProjectsPage.css";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
-function ProjectsPage({ onProjectCreated }) {
+const getToken = () => localStorage.getItem("devtrack_token");
+
+function ProjectsPage({ onProjectCreated, onProjectDeleted, onProjectOpen, search = "" }) {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -15,36 +17,24 @@ function ProjectsPage({ onProjectCreated }) {
     description: "",
   });
 
-  const getToken = () => localStorage.getItem("devtrack_token");
-
-  const fetchProjects = async () => {
-    setLoading(true);
-    setError("");
-
-    try {
-      const response = await fetch(`${API_URL}/projects`, {
-        headers: {
-          Authorization: `Bearer ${getToken()}`,
-        },
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.detail || "Unable to load projects.");
-      }
-
-      setProjects(data);
-    } catch (err) {
-      setError(err.message || "Something went wrong.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
-    fetchProjects();
-  }, []);
+    const controller = new AbortController();
+    fetch(`${API_URL}/projects`, {
+      headers: { Authorization: `Bearer ${getToken()}` },
+      signal: controller.signal,
+    }).then(async response => {
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || "Unable to load projects.");
+      if (!controller.signal.aborted) setProjects(data);
+    }).catch(error => {
+      if (!controller.signal.aborted) setError(error.message);
+    }).finally(() => {
+      if (!controller.signal.aborted) setLoading(false);
+    });
+    return () => controller.abort();
+  }, [retry]);
 
   const handleCreateProject = async (event) => {
     event.preventDefault();
@@ -115,10 +105,15 @@ function ProjectsPage({ onProjectCreated }) {
       setProjects((current) =>
         current.filter((project) => project.id !== projectId)
       );
+      onProjectDeleted?.(projectId);
     } catch (err) {
       setError(err.message || "Something went wrong.");
     }
   };
+
+  const visibleProjects = projects.filter(project =>
+    `${project.name} ${project.description || ""}`.toLowerCase().includes(search.trim().toLowerCase())
+  );
 
   return (
     <div className="projects-page">
@@ -228,7 +223,7 @@ function ProjectsPage({ onProjectCreated }) {
         <div className="projects-error">
           <span>!</span>
           {error}
-          <button onClick={fetchProjects}>Try again</button>
+          <button onClick={() => { setLoading(true); setError(""); setRetry(value => value + 1); }}>Try again</button>
         </div>
       )}
 
@@ -260,9 +255,11 @@ function ProjectsPage({ onProjectCreated }) {
             ＋ Create your first project
           </button>
         </div>
+      ) : visibleProjects.length === 0 ? (
+        <p className="projects-state">No projects match your search.</p>
       ) : (
         <div className="projects-card-grid">
-          {projects.map((project, index) => (
+          {visibleProjects.map((project, index) => (
             <article className="project-card" key={project.id}>
               <div className="project-card-top">
                 <div className={`project-card-icon color-${index % 3}`}>
@@ -294,6 +291,7 @@ function ProjectsPage({ onProjectCreated }) {
               </div>
 
               <div className="project-card-footer">
+                {onProjectOpen && <button className="project-open-button" onClick={() => onProjectOpen(project.id)}>Open project →</button>}
                 <div className="project-owner">
                   <div className="project-owner-avatar">U</div>
                   <span>Owner #{project.owner_id}</span>
