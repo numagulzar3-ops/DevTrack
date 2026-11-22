@@ -299,3 +299,94 @@ button { cursor: pointer; }
   .calendar-toolbar { gap: 6px; }
   .dashboard-footer { gap: 10px; flex-wrap: wrap; }
 }
+
+.task-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  grid-column: 1 / -1;
+}
+
+.task-row-actions .secondary-button {
+  padding: 5px 10px;
+}
+
+.welcome-row {
+  padding: clamp(22px, 4vw, 42px);
+  border: 1px solid #ded7fe;
+  border-radius: 24px;
+  background: radial-gradient(ellipse at top right, #ded3ff, transparent 65%), #f1edff;
+}
+
+.welcome-row h1 {
+  font-size: clamp(28px, 4vw, 46px);
+  letter-spacing: -.045em;
+}
+
+.welcome-row .eyebrow,
+.welcome-subtitle {
+  color: #514574;
+}
+
+.welcome-subtitle,
+.nav-link,
+.primary-button,
+.search-box input {
+  font-size: 14px;
+}
+
+.stat-card,
+.panel,
+.kanban-column {
+  border-radius: 16px;
+}
+
+.stat-top,
+.page-intro p {
+  color: #596278;
+}
+
+.task-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  margin-bottom: 16px;
+}
+
+.task-filters label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #434960;
+  font-size: 14px;
+}
+
+.task-filters select {
+  max-width: min(50vw, 210px);
+  border: 1px solid #d5d8e5;
+  border-radius: 8px;
+  background: #fff;
+  padding: 8px 10px;
+  color: #24283b;
+}
+
+.app-shell :focus-visible {
+  outline: 2px solid #7854d1;
+  outline-offset: 3px;
+}
+
+.app-shell button:disabled {
+  cursor: not-allowed;
+  opacity: .6;
+}
+
+@media (max-width: 580px) {
+  .welcome-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .search-box {
+    width: min(42vw, 245px);
+  }
+}

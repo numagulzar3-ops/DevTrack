@@ -1,6 +1,6 @@
 
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
 
@@ -59,6 +59,9 @@ class TaskCreate(BaseModel):
     due_date: Optional[datetime] = None
 
 
+TaskStatus = Literal["todo", "in_progress", "done"]
+
+
 class TaskUpdate(BaseModel):
     title: Optional[str] = Field(default=None, min_length=2, max_length=200)
     description: Optional[str] = None
@@ -67,6 +70,7 @@ class TaskUpdate(BaseModel):
         pattern="^(low|medium|high)$"
     )
     completed: Optional[bool] = None
+    status: Optional[TaskStatus] = None
     due_date: Optional[datetime] = None
 
 
@@ -78,6 +82,16 @@ class TaskResponse(BaseModel):
     description: Optional[str]
     priority: str
     completed: bool
+    status: TaskStatus
     due_date: Optional[datetime]
     project_id: int
+    created_at: datetime
+
+
+class ActivityResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    action: str
+    subject: str
     created_at: datetime
