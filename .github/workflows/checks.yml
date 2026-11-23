@@ -38,3 +38,9 @@ jobs:
       - run: node --test
       - run: npm run lint
       - run: npm run build
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install playwright
+      - run: python -m playwright install --with-deps chromium
+      - run: python tests/check_responsive.py
