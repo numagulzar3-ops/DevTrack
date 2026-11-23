@@ -45,9 +45,9 @@ button { cursor: pointer; }
 
 /* MAIN + TOPBAR */
 .main-content { min-width: 0; flex: 1; }
-.topbar { height: 76px; background: white; border-bottom: 1px solid #eceef4; display: flex; justify-content: space-between; align-items: center; padding: 0 38px; }
-.breadcrumbs { display: flex; gap: 12px; align-items: center; font-size: 12px; color: #9398a9; }
-.breadcrumbs strong { color: #292d40; font-weight: 650; }
+.topbar { min-height: 76px; background: white; border-bottom: 1px solid #eceef4; display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 12px 38px; }
+.breadcrumbs { display: flex; min-width: 0; gap: 12px; align-items: center; font-size: 12px; color: #9398a9; }
+.breadcrumbs strong { min-width: 0; overflow-wrap: anywhere; color: #292d40; font-weight: 650; }
 .crumb-divider { color: #c6c9d3; }
 .topbar-actions { display: flex; align-items: center; gap: 14px; }
 .search-box { width: 245px; height: 37px; background: #f7f8fb; border: 1px solid #eceef4; border-radius: 8px; display: flex; align-items: center; padding: 0 10px; gap: 8px; color: #8f94a5; }
@@ -170,7 +170,7 @@ button { cursor: pointer; }
 /* PROJECT DETAILS */
 .back-button { border: 0; background: transparent; color: #795ddd; font-size: 11px; margin-bottom: 22px; }
 .detail-header { display: flex; align-items: center; gap: 15px; margin-bottom: 25px; }
-.detail-title { flex: 1; }
+.detail-title { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .detail-title .eyebrow { margin-bottom: 6px; }
 .detail-title h2 { color: #292d40; font-size: 23px; }
 .detail-title p { color: #969aaa; font-size: 11px; margin-top: 5px; }
@@ -269,7 +269,6 @@ button { cursor: pointer; }
   .topbar {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    height: auto;
     gap: 12px;
     padding: 14px 16px;
   }
@@ -293,27 +292,20 @@ button { cursor: pointer; }
     font-size: 16px;
   }
   .breadcrumbs { flex-wrap: wrap; gap: 6px; }
-  .breadcrumbs strong { overflow-wrap: anywhere; }
   .topbar .workspace-search, .topbar .search-box { width: 100%; }
   .topbar .search-box { height: 44px; }
   .topbar .search-box input { font-size: 16px; }
   .dashboard { padding: 24px 15px; }
   .content-grid, .kanban-board { grid-template-columns: minmax(0, 1fr); }
   .kanban-column { min-height: auto; }
-  .detail-header, .panel-heading, .calendar-toolbar { flex-wrap: wrap; }
-  .detail-title { min-width: 0; overflow-wrap: anywhere; }
+  .panel-heading, .calendar-toolbar { flex-wrap: wrap; }
   .calendar-toolbar h3 { min-width: 0; }
   .calendar-scroll { overflow-x: auto; }
   .calendar-grid { min-width: 490px; }
-  .calendar-event { overflow-wrap: anywhere; }
   .task-table-head { display: none; }
   .task-row { grid-template-columns: minmax(0, 1fr) auto; }
   .task-row .status-select { grid-column: 1; }
   .task-row-actions { grid-column: 1 / -1; flex-wrap: wrap; }
-  .task-copy, .kanban-card, .activity-text, .workspace-search-results {
-    min-width: 0;
-    overflow-wrap: anywhere;
-  }
   .app-shell .primary-button,
   .app-shell .secondary-button,
   .app-shell .calendar-toolbar button,
@@ -468,7 +460,43 @@ button { cursor: pointer; }
   width: 100%;
   padding: 10px 0;
 }
-.deadline-task time { white-space: nowrap; }
+.deadline-task > span { min-width: 0; overflow-wrap: anywhere; }
+.deadline-task time { flex-shrink: 0; white-space: nowrap; }
+
+.project-title-row > div,
+.project-title-row .task-title-button,
+.task-copy,
+.activity-copy,
+.kanban-card,
+.calendar-event,
+.workspace-search-results {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 900px) {
+  .detail-header {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .project-detail-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 420px) {
+  .deadline-task {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .calendar-toolbar .today-button {
+    margin-left: 0;
+  }
+}
 
 .calendar-event {
   width: 100%;
