@@ -267,6 +267,8 @@
 }
 
 @media (max-width: 520px) {
+  .auth-card input { font-size: 16px; }
+
   .auth-card {
     padding: 30px 24px 22px;
   }
