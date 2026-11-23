@@ -2,11 +2,12 @@
 import { useEffect, useMemo, useState } from "react";
 import "./App.css";
 import ProjectsPage from "./ProjectsPage";
+import TaskPanel from "./TaskPanel";
 import { workspaceRequest } from "./workspaceApi";
 
 const taskStatuses = { todo: "To Do", in_progress: "In Progress", done: "Done" };
 const projectColors = ["purple", "blue", "orange", "green"];
-const emptyTask = { title: "", projectId: "", priority: "medium", due: "" };
+const emptyTask = { title: "", description: "", projectId: "", priority: "medium", due: "" };
 
 const team = [
   { name: "Numa Khan", role: "Administrator", email: "numa@example.com", initials: "NK", color: "purple" },
@@ -43,7 +44,7 @@ function ProgressBar({ value, color = "purple" }) {
   );
 }
 
-function App() {
+function App({ request = workspaceRequest, onExitDemo }) {
   const [activePage, setActivePage] = useState("Overview");
   const [projectRecords, setProjectRecords] = useState([]);
   const [taskRecords, setTaskRecords] = useState([]);
@@ -75,7 +76,7 @@ function App() {
   useEffect(() => {
     const controller = new AbortController();
     const options = { signal: controller.signal };
-    Promise.all([workspaceRequest("/projects", options), workspaceRequest("/tasks", options)])
+    Promise.all([request("/projects", options), request("/tasks", options)])
       .then(([projects, tasks]) => {
         if (controller.signal.aborted) return;
         setProjectRecords(projects);
@@ -88,7 +89,7 @@ function App() {
         if (!controller.signal.aborted) setWorkspaceLoading(false);
       });
     return () => controller.abort();
-  }, [workspaceRetry]);
+  }, [request, workspaceRetry]);
 
   const projects = useMemo(() => projectRecords.map(project => {
     const projectTasks = taskRecords.filter(task => task.project_id === project.id);
@@ -121,22 +122,21 @@ function App() {
   const completedTasks = tasks.filter(task => task.status === "Done").length;
   const pendingTasks = tasks.filter(task => task.status !== "Done").length;
   useEffect(() => {
-    if (activePage !== "Overview" && activePage !== "Activity") return;
+    if (activePage !== "Overview" && activePage !== "Activity" && !selectedProjectId) return;
 
     const controller = new AbortController();
     const params = new URLSearchParams({ limit: activePage === "Overview" ? "3" : "50" });
     if (activePage === "Activity" && activityKind) params.set("kind", activityKind);
+    if (selectedProjectId) {
+      params.set("project_id", selectedProjectId);
+      params.set("limit", "5");
+    }
 
     async function loadActivity() {
       setActivityLoading(true);
       setActivityError("");
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/activity?${params}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem("devtrack_token")}` },
-          signal: controller.signal,
-        });
-        if (!response.ok) throw new Error("Unable to load activity.");
-        const events = await response.json();
+        const events = await request(`/activity?${params}`, { signal: controller.signal });
         if (!controller.signal.aborted) setActivityItems(events);
       } catch {
         if (!controller.signal.aborted) setActivityError("Unable to load activity.");
@@ -147,7 +147,7 @@ function App() {
 
     loadActivity();
     return () => controller.abort();
-  }, [activePage, activityKind, activityRevision]);
+  }, [activePage, activityKind, activityRevision, request, selectedProjectId]);
 
   const today = new Date();
   const todayKey = [today.getFullYear(), today.getMonth() + 1, today.getDate()]
@@ -155,9 +155,16 @@ function App() {
   const overdueTasks = tasks.filter(task => task.status !== "Done" && task.due_date && task.due < todayKey);
   const filteredTasks = tasks.filter(task =>
     (!projectFilter || String(task.project_id) === projectFilter) &&
-    (taskFilter === "all" || (taskFilter === "overdue" ? overdueTasks.includes(task) : task.status === taskFilter)) &&
-    `${task.title} ${task.project} ${task.priority}`.toLowerCase().includes(search.trim().toLowerCase())
+    (taskFilter === "all" || (taskFilter === "overdue" ? overdueTasks.includes(task) : task.status === taskFilter))
   );
+
+  const query = search.trim().toLowerCase();
+  const foundProjects = query ? projects.filter(project =>
+    `${project.name} ${project.description ?? ""}`.toLowerCase().includes(query)
+  ).slice(0, 5) : [];
+  const foundTasks = query ? tasks.filter(task =>
+    `${task.title} ${task.description ?? ""} ${task.project}`.toLowerCase().includes(query)
+  ).slice(0, 5) : [];
 
   function renderTaskFilters() {
     return (
@@ -208,7 +215,7 @@ function App() {
   function createProject(event) {
     event.preventDefault();
     saveWorkspaceChange(async () => {
-      const project = await workspaceRequest(editingProject ? `/projects/${editingProject}` : "/projects", {
+      const project = await request(editingProject ? `/projects/${editingProject}` : "/projects", {
         method: editingProject ? "PUT" : "POST",
         body: { name: newProject.name.trim(), description: newProject.description.trim() || null },
       });
@@ -223,10 +230,12 @@ function App() {
     setEditingTask(task?.id ?? null);
     setTaskDraft(task ? {
       title: task.title,
+      description: task.description ?? "",
+      status: taskRecords.find(record => record.id === task.id)?.status,
       projectId: String(task.project_id),
       priority: task.priority.toLowerCase(),
       due: task.due_date?.slice(0, 10) || "",
-    } : { ...emptyTask, projectId: String(selectedProject?.id ?? projects[0]?.id ?? "") });
+    } : { ...emptyTask, projectId: String(selectedProject?.id ?? (projectFilter || projects[0]?.id || "")) });
     setShowTaskForm(true);
   }
 
@@ -234,10 +243,12 @@ function App() {
     event.preventDefault();
     saveWorkspaceChange(async () => {
       const path = editingTask ? `/tasks/${editingTask}` : `/projects/${taskDraft.projectId}/tasks`;
-      const task = await workspaceRequest(path, {
+      const task = await request(path, {
         method: editingTask ? "PATCH" : "POST",
         body: {
           title: taskDraft.title.trim(),
+          description: taskDraft.description.trim() || null,
+          ...(editingTask && { status: taskDraft.status }),
           priority: taskDraft.priority,
           due_date: taskDraft.due ? `${taskDraft.due}T00:00:00Z` : null,
         },
@@ -252,7 +263,7 @@ function App() {
   function updateTaskStatus(id, label) {
     const status = Object.keys(taskStatuses).find(value => taskStatuses[value] === label);
     saveWorkspaceChange(async () => {
-      const task = await workspaceRequest(`/tasks/${id}`, { method: "PATCH", body: { status } });
+      const task = await request(`/tasks/${id}`, { method: "PATCH", body: { status } });
       setTaskRecords(current => current.map(item => item.id === id ? task : item));
     });
   }
@@ -260,7 +271,7 @@ function App() {
   function deleteTask(task) {
     if (!window.confirm(`Delete "${task.title}"?`)) return;
     saveWorkspaceChange(async () => {
-      await workspaceRequest(`/tasks/${task.id}`, { method: "DELETE" });
+      await request(`/tasks/${task.id}`, { method: "DELETE" });
       setTaskRecords(current => current.filter(item => item.id !== task.id));
     });
   }
@@ -269,6 +280,11 @@ function App() {
     setActivePage(page);
     setSelectedProject(null);
     setSearch("");
+  }
+
+  function openProject(id) {
+    openPage("My Projects");
+    setSelectedProject(id);
   }
 
   function renderTask(task) {
@@ -304,6 +320,8 @@ function App() {
   function renderProjects() {
     if (selectedProject) {
       const projectTasks = tasks.filter(task => task.project_id === selectedProject.id);
+      const upcoming = projectTasks.filter(task => task.status !== "Done" && task.due_date && task.due >= todayKey)
+        .sort((first, second) => first.due.localeCompare(second.due)).slice(0, 5);
       return (
         <section className="page-section">
           <button className="back-button" onClick={() => setSelectedProject(null)}>← Back to projects</button>
@@ -314,7 +332,14 @@ function App() {
               <h2>{selectedProject.name}</h2>
               <p>{selectedProject.description || selectedProject.category}</p>
             </div>
-            <button className="secondary-button" disabled={saving} onClick={() => openProjectForm(selectedProject)}>Edit project</button>
+            <div className="project-detail-actions">
+              <button className="secondary-button" disabled={saving} onClick={() => openProjectForm(selectedProject)}>Edit project</button>
+              <button className="secondary-button" onClick={() => {
+                openPage("Task Board");
+                setProjectFilter(String(selectedProject.id));
+                setTaskFilter("all");
+              }}>Open project board →</button>
+            </div>
           </div>
           <div className="stats-grid detail-stats">
             <div className="stat-card"><span className="stat-label">Completion</span><div className="stat-value">{selectedProject.progress}%</div><ProgressBar value={selectedProject.progress} color={selectedProject.color} /></div>
@@ -327,6 +352,20 @@ function App() {
               <button className="primary-button small-button" disabled={saving} onClick={() => openTaskForm()}>＋ Add task</button>
             </div>
             {projectTasks.length ? projectTasks.map(renderTask) : <div className="empty-state">No tasks yet. Add your first task to get started.</div>}
+          </div>
+          <div className="project-detail-panels">
+            <div className="panel">
+              <div className="panel-heading"><h2>Upcoming deadlines</h2></div>
+              {upcoming.length ? upcoming.map(task => (
+                <button key={task.id} className="deadline-task" onClick={() => openTaskForm(task)}>
+                  <span>{task.title}</span><time dateTime={task.due}>{task.due}</time>
+                </button>
+              )) : <p className="empty-state">No upcoming deadlines.</p>}
+            </div>
+            <div className="panel">
+              <div className="panel-heading"><h2>Recent project activity</h2></div>
+              {renderActivityItems()}
+            </div>
           </div>
         </section>
       );
@@ -373,7 +412,7 @@ function App() {
                 {columnTasks.map(task => (
                   <article className="kanban-card" key={task.id}>
                     <span className={`priority priority-${task.priority.toLowerCase()}`}>{task.priority}</span>
-                    <h3>{task.title}</h3>
+                    <h3><button className="task-title-button" onClick={() => openTaskForm(task)}>{task.title}</button></h3>
                     <p>{task.project}</p>
                     <div className="kanban-card-bottom">
                       <span>◷ {task.due}</span>
@@ -416,7 +455,7 @@ function App() {
               return (
                 <div className={`calendar-cell ${!day ? "blank" : ""}`} key={index}>
                   <span className={isToday ? "today-number" : ""}>{day || ""}</span>
-                  {dueTasks.map(task => <div className="calendar-event" key={task.id}>{task.title}</div>)}
+                  {dueTasks.map(task => <button className="calendar-event" key={task.id} onClick={() => openTaskForm(task)}>{task.title}</button>)}
                 </div>
               );
             })}
@@ -591,7 +630,7 @@ function renderOverview() {
               <div className="project-main">
                 <div className="project-title-row">
                   <div>
-                    <h3>{project.name}</h3>
+                    <h3><button className="task-title-button" onClick={() => openProject(project.id)}>{project.name}</button></h3>
                     <span>{project.category}</span>
                   </div>
                   <strong>{project.progress}%</strong>
@@ -759,7 +798,7 @@ function renderTeam() {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand"><div className="brand-mark">D</div><span>dev<span className="brand-light">track</span></span></div>
-        <div className="workspace-switcher"><div className="workspace-icon">N</div><div className="workspace-info"><strong>Numa's Workspace</strong><span>Free workspace</span></div><span className="switch-arrow">⌄</span></div>
+        <div className="workspace-switcher"><div className="workspace-icon">N</div><div className="workspace-info"><strong>{onExitDemo ? "Demo Workspace" : "Numa’s Workspace"}</strong><span>Free workspace</span></div><span className="switch-arrow">⌄</span></div>
         <nav className="side-navigation">
           {navGroups.map(group => <div className="nav-group" key={group.section}><p className="nav-heading">{group.section}</p>{group.items.map(item => <button key={item.name} className={`nav-link ${activePage === item.name ? "active" : ""}`} onClick={() => openPage(item.name)}><span className="nav-icon">{item.icon}</span>{item.name}{item.name === "My Tasks" && <span className="nav-count">{pendingTasks}</span>}</button>)}</div>)}
           <div className="nav-group"><p className="nav-heading">TOOLS</p><button className={`nav-link ${activePage === "Task Board" ? "active" : ""}`} onClick={() => openPage("Task Board")}><span className="nav-icon">▥</span>Kanban Board</button></div>
@@ -772,6 +811,10 @@ function renderTeam() {
       </aside>
 
       <main className="main-content">
+        {onExitDemo && <div className="demo-banner">
+          <span>Demo workspace · Changes reset when you leave or refresh.</span>
+          <button className="secondary-button" onClick={onExitDemo}>Exit demo</button>
+        </div>}
         {saveError && <p className="empty-state" role="alert">{saveError}</p>}
         {workspaceLoading && <p className="empty-state" role="status">Loading workspace…</p>}
         {workspaceError && <div className="empty-state" role="alert">
@@ -783,16 +826,34 @@ function renderTeam() {
         </div>}
         <header className="topbar">
           <div className="breadcrumbs"><span>Workspace</span><span className="crumb-divider">/</span><strong>{selectedProject ? selectedProject.name : activePage}</strong></div>
-          {["My Projects", "My Tasks", "Task Board"].includes(activePage) && !selectedProject && (
-            <div className="topbar-actions">
-              <div className="search-box"><span aria-hidden="true">⌕</span><input aria-label="Search this page" placeholder="Search this page" value={search} onChange={event => setSearch(event.target.value)} /></div>
+          <div className="workspace-search" role="search"
+            onKeyDown={event => { if (event.key === "Escape") setSearch(""); }}>
+            <div className="search-box">
+              <span aria-hidden="true">⌕</span>
+              <input type="search" aria-label="Search workspace" placeholder="Search projects and tasks"
+                value={search} onChange={event => setSearch(event.target.value)} />
             </div>
-          )}
+            {query && (
+              <div className="workspace-search-results">
+                {!foundProjects.length && !foundTasks.length && <p role="status">No matching projects or tasks.</p>}
+                {foundProjects.map(project => (
+                  <button key={project.id} onClick={() => openProject(project.id)}>
+                    <strong>{project.name}</strong><span>Project</span>
+                  </button>
+                ))}
+                {foundTasks.map(task => (
+                  <button key={task.id} onClick={() => { openProject(task.project_id); openTaskForm(task); }}>
+                    <strong>{task.title}</strong><span>Task · {task.project}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </header>
 
         {workspaceLoading || workspaceError ? null : activePage === "My Projects" && !selectedProject ? (
           <ProjectsPage onProjectCreated={projectCreated} onProjectDeleted={projectDeleted}
-            onProjectOpen={setSelectedProject} search={search} />
+            onProjectOpen={openProject} request={request} />
         ) : (
           <div className="dashboard">
             {pageContent[activePage]
@@ -828,29 +889,9 @@ function renderTeam() {
         </div>
       )}
       {showTaskForm && (
-        <div className="modal-backdrop">
-          <form className="modal" onSubmit={createTask}>
-            <h2>{editingTask ? "Edit task" : "Create a task"}</h2>
-            {saveError && <p role="alert">{saveError}</p>}
-            <label>Task title<input required minLength={2} maxLength={200} autoFocus value={taskDraft.title}
-              onChange={event => setTaskDraft({ ...taskDraft, title: event.target.value })} /></label>
-            <label>Project<select required disabled={Boolean(editingTask)} value={taskDraft.projectId}
-              onChange={event => setTaskDraft({ ...taskDraft, projectId: event.target.value })}>
-              {projects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}
-            </select></label>
-            <label>Priority<select value={taskDraft.priority}
-              onChange={event => setTaskDraft({ ...taskDraft, priority: event.target.value })}>
-              <option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option>
-            </select></label>
-            <label>Due date<input type="date" value={taskDraft.due}
-              onChange={event => setTaskDraft({ ...taskDraft, due: event.target.value })} /></label>
-            <div className="modal-actions">
-              <button type="button" className="secondary-button" disabled={saving}
-                onClick={() => { setShowTaskForm(false); setSaveError(""); }}>Cancel</button>
-              <button className="primary-button" disabled={saving}>{editingTask ? "Save task" : "Create task"}</button>
-            </div>
-          </form>
-        </div>
+        <TaskPanel editing={Boolean(editingTask)} draft={taskDraft} setDraft={setTaskDraft}
+          projects={projects} statuses={taskStatuses} saving={saving} error={saveError}
+          onSubmit={createTask} onClose={() => { setShowTaskForm(false); setSaveError(""); }} />
       )}
     </div>
   );

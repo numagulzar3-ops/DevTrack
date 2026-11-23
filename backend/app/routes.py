@@ -130,7 +130,8 @@ def create_project(
     )
 
     db.add(new_project)
-    db.add(ActivityEvent(owner_id=current_user.id, action="project_created", subject=new_project.name))
+    db.flush()
+    db.add(ActivityEvent(owner_id=current_user.id, action="project_created", subject=new_project.name, project_id=new_project.id))
     db.commit()
     db.refresh(new_project)
 
@@ -178,7 +179,7 @@ def update_project(
     if (project.name, project.description) != (project_data.name, project_data.description):
         project.name = project_data.name
         project.description = project_data.description
-        db.add(ActivityEvent(owner_id=current_user.id, action="project_updated", subject=project.name))
+        db.add(ActivityEvent(owner_id=current_user.id, action="project_updated", subject=project.name, project_id=project.id))
         db.commit()
         db.refresh(project)
     return project
@@ -204,7 +205,7 @@ def delete_project(
             detail="Project not found"
         )
 
-    db.add(ActivityEvent(owner_id=current_user.id, action="project_deleted", subject=project.name))
+    db.add(ActivityEvent(owner_id=current_user.id, action="project_deleted", subject=project.name, project_id=project.id))
     db.delete(project)
     db.commit()
 
@@ -244,7 +245,7 @@ def create_task(
     )
 
     db.add(new_task)
-    db.add(ActivityEvent(owner_id=current_user.id, action="task_created", subject=new_task.title))
+    db.add(ActivityEvent(owner_id=current_user.id, action="task_created", subject=new_task.title, project_id=project.id))
     db.commit()
     db.refresh(new_task)
 
@@ -334,7 +335,7 @@ def update_task(
         action = "task_updated"
         if "completed" in changed_fields:
             action = "task_completed" if task.completed else "task_reopened"
-        db.add(ActivityEvent(owner_id=current_user.id, action=action, subject=task.title))
+        db.add(ActivityEvent(owner_id=current_user.id, action=action, subject=task.title, project_id=task.project_id))
 
     db.commit()
     db.refresh(task)
@@ -367,7 +368,7 @@ def delete_task(
             detail="Task not found"
         )
 
-    db.add(ActivityEvent(owner_id=current_user.id, action="task_deleted", subject=task.title))
+    db.add(ActivityEvent(owner_id=current_user.id, action="task_deleted", subject=task.title, project_id=task.project_id))
     db.delete(task)
     db.commit()
 
@@ -375,11 +376,15 @@ def delete_task(
 @router.get("/activity", response_model=list[ActivityResponse])
 def get_activity(
     kind: Literal["project", "task"] | None = None,
+    project_id: int | None = None,
     limit: int = Query(default=50, ge=1, le=100),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     events = db.query(ActivityEvent).filter(ActivityEvent.owner_id == current_user.id)
+    if project_id is not None:
+        get_project(project_id, db, current_user)
+        events = events.filter(ActivityEvent.project_id == project_id)
     if kind is not None:
         events = events.filter(ActivityEvent.action.startswith(f"{kind}_", autoescape=True))
     return events.order_by(

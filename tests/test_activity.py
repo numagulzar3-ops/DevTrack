@@ -35,6 +35,18 @@ def test_activity_records_changes_and_is_scoped_to_owner(client):
     saved = client.get("/tasks", headers=owner).json()[0]
     assert saved["status"] == "in_progress"
     assert saved["due_date"].startswith("2026-12-02")
+
+    description = client.patch(task_url, headers=owner, json={"description": "Review the notes"})
+    assert description.status_code == 200
+    assert client.get("/tasks", headers=owner).json()[0]["description"] == "Review the notes"
+    project_id = project.json()["id"]
+    assert client.post("/projects", headers=owner, json={"name": "Separate project"}).status_code == 201
+    scoped = client.get(f"/activity?project_id={project_id}", headers=owner)
+    assert scoped.status_code == 200
+    assert [event["action"] for event in scoped.json()] == [
+        "task_updated", "task_updated", "task_created", "project_updated", "project_created",
+    ]
+    assert client.get(f"/activity?project_id={project_id}", headers=other).status_code == 404
     assert client.patch(task_url, headers=owner, json={
         "status": "done", "completed": False,
     }).status_code == 422
@@ -47,9 +59,9 @@ def test_activity_records_changes_and_is_scoped_to_owner(client):
     events = client.get("/activity", headers=owner).json()
     assert [event["action"] for event in events] == [
         "project_deleted", "task_deleted", "task_reopened", "task_completed",
-        "task_updated", "task_created", "project_updated", "project_created",
+        "project_created", "task_updated", "task_updated", "task_created", "project_updated", "project_created",
     ]
     assert all(event["created_at"] for event in events)
     assert client.get("/activity?kind=task&limit=1", headers=owner).json() == events[1:2]
-    assert client.get("/activity?kind=project", headers=owner).json() == [events[0], *events[-2:]]
+    assert client.get("/activity?kind=project", headers=owner).json() == [events[0], events[4], *events[-2:]]
     assert client.get("/activity", headers=other).json() == []
