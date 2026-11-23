@@ -4,7 +4,7 @@ import "./AuthPage.css";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
-function AuthPage({ onAuthenticated }) {
+function AuthPage({ onAuthenticated, onTryDemo }) {
   const [mode, setMode] = useState("login");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -183,6 +183,10 @@ function AuthPage({ onAuthenticated }) {
           <button type="button" onClick={switchMode}>
             {isRegister ? "Sign in" : "Create an account"}
           </button>
+        </div>
+
+        <div className="auth-switch">
+          <button type="button" onClick={onTryDemo} disabled={loading}>Try the demo workspace →</button>
         </div>
 
         <div className="auth-footer">

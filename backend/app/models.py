@@ -109,6 +109,7 @@ class ActivityEvent(Base):
         nullable=False,
         index=True,
     )
+    project_id = Column(Integer, nullable=True, index=True)
     action = Column(String(30), nullable=False)
     subject = Column(String(200), nullable=False)
     created_at = Column(

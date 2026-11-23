@@ -2,11 +2,7 @@
 import { useEffect, useState } from "react";
 import "./ProjectsPage.css";
 
-const API_URL = import.meta.env.VITE_API_URL;
-
-const getToken = () => localStorage.getItem("devtrack_token");
-
-function ProjectsPage({ onProjectCreated, onProjectDeleted, onProjectOpen, search = "" }) {
+function ProjectsPage({ onProjectCreated, onProjectDeleted, onProjectOpen, request }) {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -21,12 +17,7 @@ function ProjectsPage({ onProjectCreated, onProjectDeleted, onProjectOpen, searc
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch(`${API_URL}/projects`, {
-      headers: { Authorization: `Bearer ${getToken()}` },
-      signal: controller.signal,
-    }).then(async response => {
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.detail || "Unable to load projects.");
+    request("/projects", { signal: controller.signal }).then(data => {
       if (!controller.signal.aborted) setProjects(data);
     }).catch(error => {
       if (!controller.signal.aborted) setError(error.message);
@@ -34,7 +25,7 @@ function ProjectsPage({ onProjectCreated, onProjectDeleted, onProjectOpen, searc
       if (!controller.signal.aborted) setLoading(false);
     });
     return () => controller.abort();
-  }, [retry]);
+  }, [request, retry]);
 
   const handleCreateProject = async (event) => {
     event.preventDefault();
@@ -42,23 +33,13 @@ function ProjectsPage({ onProjectCreated, onProjectDeleted, onProjectOpen, searc
     setSubmitting(true);
 
     try {
-      const response = await fetch(`${API_URL}/projects`, {
+      const data = await request("/projects", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${getToken()}`,
-        },
-        body: JSON.stringify({
+        body: {
           name: newProject.name.trim(),
           description: newProject.description.trim() || null,
-        }),
+        },
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.detail || "Unable to create project.");
-      }
 
       // Update the projects list
       setProjects((current) => [data, ...current]);
@@ -87,20 +68,7 @@ function ProjectsPage({ onProjectCreated, onProjectDeleted, onProjectOpen, searc
     setError("");
 
     try {
-      const response = await fetch(
-        `${API_URL}/projects/${projectId}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${getToken()}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.detail || "Unable to delete project.");
-      }
+      await request(`/projects/${projectId}`, { method: "DELETE" });
 
       setProjects((current) =>
         current.filter((project) => project.id !== projectId)
@@ -110,10 +78,6 @@ function ProjectsPage({ onProjectCreated, onProjectDeleted, onProjectOpen, searc
       setError(err.message || "Something went wrong.");
     }
   };
-
-  const visibleProjects = projects.filter(project =>
-    `${project.name} ${project.description || ""}`.toLowerCase().includes(search.trim().toLowerCase())
-  );
 
   return (
     <div className="projects-page">
@@ -255,11 +219,9 @@ function ProjectsPage({ onProjectCreated, onProjectDeleted, onProjectOpen, searc
             ＋ Create your first project
           </button>
         </div>
-      ) : visibleProjects.length === 0 ? (
-        <p className="projects-state">No projects match your search.</p>
       ) : (
         <div className="projects-card-grid">
-          {visibleProjects.map((project, index) => (
+          {projects.map((project, index) => (
             <article className="project-card" key={project.id}>
               <div className="project-card-top">
                 <div className={`project-card-icon color-${index % 3}`}>

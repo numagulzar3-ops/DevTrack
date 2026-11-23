@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import App from "./App";
 import AuthPage from "./AuthPage";
+import { createDemoWorkspace } from "./demoWorkspace";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -10,6 +11,7 @@ function AuthGate() {
     () => localStorage.getItem("devtrack_token")
   );
 
+  const [demoRequest, setDemoRequest] = useState(null);
   const [checking, setChecking] = useState(Boolean(token));
 
   useEffect(() => {
@@ -66,8 +68,13 @@ function AuthGate() {
     );
   }
 
+  if (demoRequest) {
+    return <App request={demoRequest} onExitDemo={() => setDemoRequest(null)} />;
+  }
+
   if (!token) {
-    return <AuthPage onAuthenticated={handleAuthenticated} />;
+    return <AuthPage onAuthenticated={handleAuthenticated}
+      onTryDemo={() => setDemoRequest(() => createDemoWorkspace())} />;
   }
 
   return <App />;
