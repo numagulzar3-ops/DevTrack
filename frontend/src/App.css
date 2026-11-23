@@ -262,24 +262,73 @@ button { cursor: pointer; }
   .project-card-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .team-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
 }
-@media(max-width:760px) {
-  .sidebar { width: 68px; padding: 22px 9px; }
-  .brand { justify-content: center; padding: 0; }
-  .brand>span,.workspace-info,.switch-arrow,.nav-heading,.upgrade-card,.profile-info,.profile-menu { display: none; }
-  .workspace-switcher { justify-content: center; padding: 8px 3px; }
-  .side-navigation { margin-top: 28px; }
-  .nav-link { justify-content: center; padding: 13px 5px; font-size: 0; }
-  .nav-icon { font-size: 17px; }
-  .profile { justify-content: center; }
-  .topbar { padding: 0 14px; }
-  .search-box { width: 150px; }
-  .search-box kbd,.icon-button:first-of-type { display: none; }
-  .dashboard { padding: 25px 15px; }
-  .content-grid { grid-template-columns: 1fr; }
-  .kanban-board { grid-template-columns: 1fr; }
+.mobile-navigation { display: none; }
+
+@media (max-width: 760px) {
+  .sidebar { display: none; }
+  .topbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    height: auto;
+    gap: 12px;
+    padding: 14px 16px;
+  }
+  .mobile-navigation {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .mobile-navigation .brand { padding: 0; font-size: 20px; }
+  .mobile-navigation .brand-mark { color: white; }
+  .mobile-navigation select {
+    min-width: 0;
+    min-height: 44px;
+    max-width: 55%;
+    padding: 6px 8px;
+    border: 1px solid #e4def6;
+    border-radius: 8px;
+    background: #f7f5ff;
+    color: #493983;
+    font-size: 16px;
+  }
+  .breadcrumbs { flex-wrap: wrap; gap: 6px; }
+  .breadcrumbs strong { overflow-wrap: anywhere; }
+  .topbar .workspace-search, .topbar .search-box { width: 100%; }
+  .topbar .search-box { height: 44px; }
+  .topbar .search-box input { font-size: 16px; }
+  .dashboard { padding: 24px 15px; }
+  .content-grid, .kanban-board { grid-template-columns: minmax(0, 1fr); }
   .kanban-column { min-height: auto; }
-  .task-row { grid-template-columns: minmax(0,1fr) 75px; }
-  .task-row .status-select { grid-column: 1 / -1; }
+  .detail-header, .panel-heading, .calendar-toolbar { flex-wrap: wrap; }
+  .detail-title { min-width: 0; overflow-wrap: anywhere; }
+  .calendar-toolbar h3 { min-width: 0; }
+  .calendar-scroll { overflow-x: auto; }
+  .calendar-grid { min-width: 490px; }
+  .calendar-event { overflow-wrap: anywhere; }
+  .task-table-head { display: none; }
+  .task-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .task-row .status-select { grid-column: 1; }
+  .task-row-actions { grid-column: 1 / -1; flex-wrap: wrap; }
+  .task-copy, .kanban-card, .activity-text, .workspace-search-results {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .app-shell .primary-button,
+  .app-shell .secondary-button,
+  .app-shell .calendar-toolbar button,
+  .app-shell .status-select,
+  .app-shell .kanban-card select {
+    min-height: 44px;
+    font-size: 13px;
+  }
+  .app-shell .modal input,
+  .app-shell .modal textarea,
+  .app-shell .modal select,
+  .app-shell .settings-panel input,
+  .app-shell .project-form-card input,
+  .app-shell .project-form-card textarea { font-size: 16px; }
+  dialog.task-panel { border-radius: 0; }
 }
 @media(max-width:520px) {
   .stats-grid { grid-template-columns: 1fr 1fr; gap: 9px; }
@@ -288,13 +337,8 @@ button { cursor: pointer; }
   .welcome-row h1,.page-intro h2 { font-size: 22px; }
   .welcome-row,.page-intro { align-items: flex-start; flex-wrap: wrap; }
   .welcome-subtitle { max-width: 230px; line-height: 1.5; }
-  .primary-button { padding: 10px; font-size: 9px; }
-  .topbar-actions { gap: 7px; }
-  .search-box { width: 120px; }
   .project-card-grid,.team-grid { grid-template-columns: 1fr; }
   .project-summary-strip { gap: 20px; justify-content: space-between; padding: 14px; }
-  .calendar-cell { min-height: 65px; padding: 6px 3px; font-size: 9px; }
-  .calendar-event { font-size: 7px; padding: 3px; }
   .calendar-toolbar h3 { min-width: 0; font-size: 13px; }
   .calendar-toolbar { gap: 6px; }
   .dashboard-footer { gap: 10px; flex-wrap: wrap; }
@@ -384,10 +428,6 @@ button { cursor: pointer; }
   .welcome-row {
     align-items: flex-start;
     flex-direction: column;
-  }
-
-  .search-box {
-    width: min(42vw, 245px);
   }
 }
 

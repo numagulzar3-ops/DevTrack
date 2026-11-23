@@ -446,19 +446,21 @@ function App({ request = workspaceRequest, onExitDemo }) {
         <div className="page-intro"><div><span className="eyebrow">PLAN YOUR WORK</span><h2>Calendar</h2><p>Keep track of upcoming deadlines and milestones.</p></div></div>
         <div className="panel calendar-panel">
           <div className="calendar-toolbar"><button onClick={() => setMonthOffset(v => v - 1)}>←</button><h3>{monthName}</h3><button onClick={() => setMonthOffset(v => v + 1)}>→</button><button className="today-button" onClick={() => setMonthOffset(0)}>Current month</button></div>
-          <div className="calendar-grid">
-            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(day => <div className="calendar-day-name" key={day}>{day}</div>)}
-            {cells.map((day, index) => {
-              const date = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-              const dueTasks = day ? tasks.filter(task => task.due === date) : [];
-              const isToday = day === today.getDate() && monthOffset === 0;
-              return (
-                <div className={`calendar-cell ${!day ? "blank" : ""}`} key={index}>
-                  <span className={isToday ? "today-number" : ""}>{day || ""}</span>
-                  {dueTasks.map(task => <button className="calendar-event" key={task.id} onClick={() => openTaskForm(task)}>{task.title}</button>)}
-                </div>
-              );
-            })}
+          <div className="calendar-scroll" role="region" aria-label="Monthly calendar" tabIndex={0}>
+            <div className="calendar-grid">
+              {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(day => <div className="calendar-day-name" key={day}>{day}</div>)}
+              {cells.map((day, index) => {
+                const date = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+                const dueTasks = day ? tasks.filter(task => task.due === date) : [];
+                const isToday = day === today.getDate() && monthOffset === 0;
+                return (
+                  <div className={`calendar-cell ${!day ? "blank" : ""}`} key={index}>
+                    <span className={isToday ? "today-number" : ""}>{day || ""}</span>
+                    {dueTasks.map(task => <button className="calendar-event" key={task.id} onClick={() => openTaskForm(task)}>{task.title}</button>)}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       </section>
@@ -825,6 +827,14 @@ function renderTeam() {
           }}>Retry</button>
         </div>}
         <header className="topbar">
+          <nav className="mobile-navigation" aria-label="Workspace navigation">
+            <div className="brand"><div className="brand-mark">D</div><span>dev<span className="brand-light">track</span></span></div>
+            <select aria-label="Workspace page" value={activePage} onChange={event => openPage(event.target.value)}>
+              {Object.keys(pageContent).map(page => (
+                <option key={page} value={page}>{page === "Task Board" ? "Kanban Board" : page}</option>
+              ))}
+            </select>
+          </nav>
           <div className="breadcrumbs"><span>Workspace</span><span className="crumb-divider">/</span><strong>{selectedProject ? selectedProject.name : activePage}</strong></div>
           <div className="workspace-search" role="search"
             onKeyDown={event => { if (event.key === "Escape") setSearch(""); }}>
